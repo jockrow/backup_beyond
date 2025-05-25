@@ -2,6 +2,10 @@
 # Author: Richard Martínez
 # Created Date: 2017/08/24
 ####################################
+# TODO: poner el nombre del branch si existe
+    # TODO: set the variable branch if the current FROM_BACKUP has a branch else put empty
+# TODO: parametrizar una mascara
+# TODO: abrir bcompare conmparando el backup con el original
 
 from datetime import datetime
 import os
@@ -22,13 +26,20 @@ def get_git_branch(repo_path):
             .decode("utf-8")
             .strip()
         )
+
+        parts = re.split(r'[/\.]', branch_name)
+        branch_name = parts[-1]
+
     except subprocess.CalledProcessError:
         branch_name = ""
     return branch_name
 
 
 # branch = get_git_branch("/Users/richard/devs/Projects/backCountPages")
-branch = get_git_branch("/Users/richard/devs/Projects/BACKUP_BEYOND_Old")
+# TODO: Validate when the source doesn't exists
+branch = get_git_branch("D:/devs/Booster/InfoCorp/TimeControl/InfoWeb3.Api")
+# branch = get_git_branch("D:/devs/python/backup_beyond")
+
 
 print(f"branch: {branch}")
 
