@@ -2,17 +2,13 @@
 # Author: Richard Martínez
 # Created Date: 2017/08/24
 ####################################
-# TODO: poner el nombre del branch si existe
-    # TODO: set the variable branch if the current FROM_BACKUP has a branch else put empty
-# TODO: parametrizar una mascara
-# TODO: abrir bcompare conmparando el backup con el original
 
 import os
 import re
 import shutil
-import zipfile
 import subprocess
 from datetime import datetime
+import time
 
 try:
     from configparser import ConfigParser
@@ -21,7 +17,7 @@ except ImportError:
 
 
 def get_git_branch(repo_path):
-    """Return the last part of the git branch name if it exists, else empty string."""
+    """Return the last part of the git branch_name name if it exists, else empty string."""
     try:
         branch_name = (
             subprocess.check_output(
@@ -38,41 +34,33 @@ def get_git_branch(repo_path):
         branch_name = ""
     return branch_name
 
-
-def trim_path(path, parent_dir, dir_to_zip):
-# TODO: Validate when the source doesn't exists
-    archive_path = path.replace(parent_dir, "", 1)
-    if parent_dir:
-        archive_path = archive_path.replace(os.path.sep, "", 1)
-    archive_path = archive_path.replace(dir_to_zip + os.path.sep, "", 1)
-    return archive_path
-
-
 def main():
-    # Load config
-    config = ConfigParser()
+    config = ConfigParser(interpolation=None)
     config.read("BACKUP_BEYOND.ini")
 
     BCOMPARE_BIN = config.get("general", "BCOMPARE_BIN")
     FROM_BACKUP = config.get("backup", "FROM_BACKUP")
     FILTER = config.get("backup", "FILTER")
+    FORMAT_MASK = config.get("backup", "FORMAT_MASK")
+    # debugpy.wait_for_client()
     displayLog = config.get("backup", "displayLog")
     compress = config.get("backup", "compress")
 
-    # Get current git branch name from FROM_BACKUP path
-    branch = get_git_branch(FROM_BACKUP)
-    print(f"branch: {branch}")
+    branch_name = get_git_branch(FROM_BACKUP)
+    branch_name = branch_name + " " if branch_name else ""
+    # if branch_name != "" branch_name + " "
 
-    # Prepare backup names and paths
-    FORMAT_DATE = datetime.now().strftime("%Y-%m-%d %H-%M-%S")
+    FORMAT_DATE = datetime.now().strftime(FORMAT_MASK)
     CURRENT_PATH = os.getcwd()
     BACKUP_NAME = re.sub(r".*[\\/]", "", CURRENT_PATH)
-    BACKUP_COMPRESS = BACKUP_NAME + " " + FORMAT_DATE
+    BACKUP_COMPRESS = branch_name + BACKUP_NAME + " " + FORMAT_DATE
 
     print("Apply Filter and Creating Backup: " + BACKUP_COMPRESS + "...")
+    start = time.time()
 
     # Build Beyond Compare command script
-    if displayLog:
+    # TODO:Mejorar el log para los tiempos reales junto con el comprimido
+    if displayLog == "True":
         displayLog = f'log normal "{CURRENT_PATH}{os.sep}backup.log" \n'
     else:
         displayLog = ""
@@ -89,26 +77,15 @@ def main():
 
     os.system(f'"{BCOMPARE_BIN}" @bCompare /silent')
 
-    # Compress backup if needed
-    if compress:
+    if compress == "True":
         print("Compressing Backup...")
-        parent_dir, dir_to_zip = os.path.split(BACKUP_COMPRESS)
-
-        outFile = zipfile.ZipFile(
-            BACKUP_COMPRESS + ".zip", "w", compression=zipfile.ZIP_DEFLATED
-        )
-        for archiveDirPath, dirNames, fileNames in os.walk(BACKUP_COMPRESS):
-            for fileName in fileNames:
-                filePath = os.path.join(archiveDirPath, fileName)
-                outFile.write(filePath, trim_path(filePath, parent_dir, dir_to_zip))
-            if not fileNames and not dirNames:
-                zipInfo = zipfile.ZipInfo(trim_path(archiveDirPath, parent_dir, dir_to_zip) + "/")
-                outFile.writestr(zipInfo, "")
-        outFile.close()
+        shutil.make_archive(BACKUP_COMPRESS, "zip", root_dir="./" + BACKUP_COMPRESS)
         shutil.rmtree(BACKUP_COMPRESS)
 
-    os.remove("bCompare")
+    end = time.time()
+    print(f"Process completed took: {end - start:.2f} seconds")
 
+    os.remove("bCompare")
 
 if __name__ == "__main__":
     main()
